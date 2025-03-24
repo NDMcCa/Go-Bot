@@ -30,7 +30,7 @@ type WeatherData struct {
 	Name string `json:"name"`
 }
 
-func getCurrentWeather(message string) *discordgo.MessageSend {
+func getCurrentWeatherZIP(message string, units string) *discordgo.MessageSend {
 	r, _ := regexp.Compile(`!zip (\d{5})`)
 	zip := r.FindStringSubmatch(message)[1]
 
@@ -40,7 +40,7 @@ func getCurrentWeather(message string) *discordgo.MessageSend {
 		}
 	}
 
-	weatherURL := fmt.Sprintf("%szip=%s&appid=%s&units=imperial", URL, zip, WeatherToken)
+	weatherURL := fmt.Sprintf("%szip=%s&appid=%s&units=%s", URL, zip, WeatherToken, units)
 
 	client := http.Client{
 		Timeout: time.Second * 2,

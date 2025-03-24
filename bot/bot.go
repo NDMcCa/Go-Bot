@@ -63,8 +63,13 @@ func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		_, _ = s.ChannelMessageSend(m.ChannelID, "Weather is not implemented yet")
 
 	case strings.Contains(m.Content, config.BotPrefix+"!zip"):
-		currentWeather := getCurrentWeather(m.Content)
-		_, _ = s.ChannelMessageSendComplex(m.ChannelID, currentWeather)
+		if strings.Contains(m.Content, "metric") {
+			currentWeather := getCurrentWeatherZIP(m.Content, "metric")
+			_, _ = s.ChannelMessageSendComplex(m.ChannelID, currentWeather)
+		} else {
+			currentWeather := getCurrentWeatherZIP(m.Content, "imperial")
+			_, _ = s.ChannelMessageSendComplex(m.ChannelID, currentWeather)
+		}
 
 	case m.Content == "<@"+BotID+"> ping":
 		_, _ = s.ChannelMessageSend(m.ChannelID, "Pong!")
