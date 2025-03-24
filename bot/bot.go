@@ -80,5 +80,8 @@ func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case m.Content == "<@"+BotID+"> help" || m.Content == config.BotPrefix+"help":
 		_, _ = s.ChannelMessageSend(m.ChannelID, "Available Commands: "+"\n `"+config.BotPrefix+"weather`"+"\n `"+config.BotPrefix+"ping`")
 
+	default:
+		_, _ = s.ChannelMessageSend(m.ChannelID, "I'm sorry, I don't understand that command. Type `"+config.BotPrefix+"help` for a list of commands.")
 	}
+
 }
