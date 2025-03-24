@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/NDMcCa/Go-Bot/config"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -30,17 +32,44 @@ type WeatherData struct {
 	Name string `json:"name"`
 }
 
-func getCurrentWeatherZIP(message string, units string) *discordgo.MessageSend {
-	r, _ := regexp.Compile(`!zip (\d{5})`)
-	zip := r.FindStringSubmatch(message)[1]
-
-	if zip == "" {
-		return &discordgo.MessageSend{
-			Content: "Invalid zip code",
+func parseWeatherCommand(message string) (string, string, string, error) {
+	if strings.Contains(message, "zip") {
+		r, _ := regexp.Compile(`!weather zip (\d{5})( -metric)?`)
+		match := r.FindStringSubmatch(message)
+		if len(match) > 0 {
+			zip := match[1]
+			units := "imperial"
+			if len(match) > 2 && strings.TrimSpace(match[2]) == "-metric" {
+				units = "metric"
+			}
+			return "zip", zip, units, nil
 		}
+		return "", "", "", fmt.Errorf("invalid zip format")
+	} else if strings.Contains(message, "city") {
+		r, _ := regexp.Compile(`!weather city (.+?)( -metric)?$`)
+		match := r.FindStringSubmatch(message)
+		if len(match) > 0 {
+			city := match[1]
+			units := "imperial"
+			if len(match) > 2 && strings.TrimSpace(match[2]) == "-metric" {
+				units = "metric"
+			}
+			return "city", city, units, nil
+		}
+		return "", "", "", fmt.Errorf("invalid city format")
+	}
+	return "", "", "", fmt.Errorf("invalid command")
+}
+
+func getCurrentWeather(locType string, locValue string, units string) *discordgo.MessageSend {
+	var weatherURL string
+	if locType == "zip" {
+		weatherURL = fmt.Sprintf("%szip=%s&appid=%s&units=%s", URL, locValue, config.WeatherKey, units)
+	} else {
+		weatherURL = fmt.Sprintf("%sq=%s&appid=%s&units=%s", URL, locValue, config.WeatherKey, units)
 	}
 
-	weatherURL := fmt.Sprintf("%szip=%s&appid=%s&units=%s", URL, zip, WeatherToken, units)
+	fmt.Println("Fetching weather from URL: " + weatherURL)
 
 	client := http.Client{
 		Timeout: time.Second * 2,
@@ -52,12 +81,33 @@ func getCurrentWeatherZIP(message string, units string) *discordgo.MessageSend {
 			Content: "Error getting weather data",
 		}
 	}
-
-	body, _ := io.ReadAll(response.Body)
 	defer response.Body.Close()
 
+	body, _ := io.ReadAll(response.Body)
+
 	var data WeatherData
-	json.Unmarshal([]byte(body), &data)
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return &discordgo.MessageSend{
+			Content: "Error parsing weather data",
+		}
+	}
+
+	if len(data.Weather) == 0 {
+		return &discordgo.MessageSend{
+			Content: "No weather data available; the location may not exist",
+		}
+	}
+
+	speed := "mph"
+	if units == "metric" {
+		speed = "km/h"
+	}
+
+	temp_unit := "°F"
+	if units == "metric" {
+		temp_unit = "°C"
+	}
 
 	location := data.Name
 	conditions := data.Weather[0].Description
@@ -77,7 +127,7 @@ func getCurrentWeatherZIP(message string, units string) *discordgo.MessageSend {
 				Inline: true,
 			}, {
 				Name:   "Temperature",
-				Value:  temp + "°F",
+				Value:  temp + temp_unit,
 				Inline: true,
 			}, {
 				Name:   "Pressure",
@@ -89,7 +139,7 @@ func getCurrentWeatherZIP(message string, units string) *discordgo.MessageSend {
 				Inline: true,
 			}, {
 				Name:   "Wind Speed",
-				Value:  windSpeed + "mph",
+				Value:  windSpeed + speed,
 				Inline: true,
 			}, {
 				Name:   "Wind Direction",

@@ -12,15 +12,11 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-var (
-	BotID        string
-	WeatherToken string = "b6ee0cf951e243fe3a840e606d01ba54"
-)
-
+var BotID string
 var GoBot *discordgo.Session
 
 func Start() {
-	fmt.Println("Got key: ", WeatherToken)
+	fmt.Println("Got key: ", config.WeatherKey)
 
 	goBot, err := discordgo.New("Bot " + config.Token)
 
@@ -40,6 +36,7 @@ func Start() {
 
 	err = goBot.Open()
 	defer goBot.Close()
+	defer os.Exit(0)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -49,8 +46,10 @@ func Start() {
 	fmt.Println("Bot is running!")
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-c
+
+	fmt.Println("Goodbye!")
 
 }
 
@@ -59,26 +58,27 @@ func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 	switch {
-	case strings.Contains(m.Content, "weather"):
-		_, _ = s.ChannelMessageSend(m.ChannelID, "Weather is not implemented yet")
-
-	case strings.Contains(m.Content, config.BotPrefix+"!zip"):
-		if strings.Contains(m.Content, "metric") {
-			currentWeather := getCurrentWeatherZIP(m.Content, "metric")
-			_, _ = s.ChannelMessageSendComplex(m.ChannelID, currentWeather)
-		} else {
-			currentWeather := getCurrentWeatherZIP(m.Content, "imperial")
-			_, _ = s.ChannelMessageSendComplex(m.ChannelID, currentWeather)
+	case strings.Contains(m.Content, config.BotPrefix+"weather"):
+		if strings.Contains(m.Content, "help") {
+			_, _ = s.ChannelMessageSend(m.ChannelID, "To get the weather, type `"+config.BotPrefix+"weather city <city name> (-metric)` or `"+config.BotPrefix+"weather zip <zip code> (-metric)`")
+			return
 		}
+		locType, locValue, units, err := parseWeatherCommand(m.Content)
+		if err != nil {
+			_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
+			return
+		}
+		currentWeather := getCurrentWeather(locType, locValue, units)
+		_, _ = s.ChannelMessageSendComplex(m.ChannelID, currentWeather)
 
-	case m.Content == "<@"+BotID+"> ping":
+	case m.Content == "<@"+BotID+"> ping" || m.Content == config.BotPrefix+"ping":
 		_, _ = s.ChannelMessageSend(m.ChannelID, "Pong!")
 
-	case m.Content == "<@"+BotID+"> help":
+	case m.Content == "<@"+BotID+"> info" || m.Content == config.BotPrefix+"info":
 		_, _ = s.ChannelMessageSend(m.ChannelID, "I am a Go Bot created by NDMcCa. My prefix is `"+config.BotPrefix+"`")
 
-	case m.Content == config.BotPrefix+"ping":
-		_, _ = s.ChannelMessageSend(m.ChannelID, "Pong!")
+	case m.Content == "<@"+BotID+"> help" || m.Content == config.BotPrefix+"help":
+		_, _ = s.ChannelMessageSend(m.ChannelID, "Available Commands: "+"\n `"+config.BotPrefix+"weather`"+"\n `"+config.BotPrefix+"ping`")
 
 	}
 }
